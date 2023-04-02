@@ -1,6 +1,39 @@
 #!/usr/bin/bash
 
-pwd
-echo "Hello World!"
+helptext()
+{
+	printf "Usage:\n"
+	printf "	repogen [FLAGS] [DIR]\n"
+	printf "Args:\n"
+	printf "	[DIR] -> optional argument that specifies where the repository should be created (defaults to the current directory).\n"
+	printf "Flags:\n"
+	printf "	'--name | -n <name>' -> The name of your remote repository\n"
+	printf "	'--url | -u <url>' -> The url of your remote repository\n"
+	printf "	'--license | -l [MIT | GPL3]' -> The license of your project\n"
+	printf "	'--help | -h' -> Displays this text\n"
+	printf "	'--version' -> Displays the version of this script\n"
+}
+
+# Git workflow to automize:
+#	 1) create files and folders (src/, testing/, docs/, private/, LICENSE, README.md, CHANGELOG.md)
+#	 2) add relevant things to the files (pick LICENSE, add PLACEHOLDER to README.md and add header to CHANGELOG.md)
+#	 3) git init
+#	 4) git add all files (don't add folders cause it would be a pain having to add only folders that users add files to)
+#	 5) git commit -m "Initial commit"
+#	 6) ask user for <name> and <url> of remote repo
+#	 7) git remote add <name> <url>
+#	 8) git push --set-upstream <name> main
 
 # get arguments from the commandline with getopt
+
+# What are going to be the arguments that I am allowed to parse?
+#	- Instantly add the <name> and <url>? With something like --name -n <name> and --url -u <url>
+# 	- Where to create the folders and files (defaults to ./): --dir -d <directory> <- maybe this shouldn't be a flag, but rather an arg
+#	- Add a license to pick, so we dont have to ask: --license -l <license>
+#	- Add an obligatory help test: --help -h
+#	- And for the fuck of it add a version test: --version -v
+PARSED_ARGUMENTS=$(getopt -n repogen -o n:u:l:hv --long name:,url:,license:,help,version -- "$@")
+
+if [ "$VALID_ARGUMENTS" != "0" ]; then
+	helptext
+fi
