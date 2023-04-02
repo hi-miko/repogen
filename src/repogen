@@ -1,0 +1,6 @@
+#!/usr/bin/bash
+
+pwd
+echo "Hello World!"
+
+# get arguments from the commandline with getopt
