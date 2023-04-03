@@ -1,5 +1,14 @@
 #!/usr/bin/bash
 
+SCRIPT_VERSION="0.9"
+
+cleanup()
+{
+	cd "$1" || (echo "Error: could not go into the given directory" && exit 1)
+	rm -rI src/ tests/ docs/ private/ LICENSE README.md CHANGELOG.md .editorconfig .gitignore
+	rm -rf .git
+}
+
 helptext()
 {
 	printf "Usage:\n"
@@ -14,8 +23,69 @@ helptext()
 	printf "	'--version' -> Displays the version of this script\n"
 }
 
+selects()
+{
+	printf "Enter the directory for the repository to be created in: "
+	read DIR
+	
+	DIR="$(realpath "$DIR" 2>/dev/null)"
+	
+	if [ "$?" != "0" ]
+	then
+		echo "Error: the given directory does not exist"
+		exit 1
+	fi
+
+	printf "Enter the name of your repository: "
+	read NAME
+
+	printf "Enter the url (web or ssh) of your repository: "
+	read URL
+
+	PS3='Select your license: '
+	options=("MIT" "GPL3" "quit")
+	select opt in "${options[@]}"
+	do
+		case $opt in
+			"MIT" | "GPL3")
+				LICENSE="$opt"
+				break
+				;;
+			"quit")
+				exit 0
+				;;
+			*)
+				echo "invalid option $REPLY"
+				;;
+		esac
+	done
+
+	printf "dir: '$DIR'\nname: '$NAME'\nurl: '$URL'\nlicense: '$LICENSE'\n"
+
+	PS3="Confirm selection:"
+	options=( "yes" "no" "quit")
+	select opt in "${options[@]}"
+	do
+		case $opt in
+			"yes")
+				break
+				;;
+			"no")
+				selects
+				break
+				;;
+			"quit")
+				exit 0
+				;;
+			*)
+				echo "invalid option $REPLY"
+				;;
+		esac
+	done
+}
+
 # Git workflow to automize:
-#	 1) create files and folders (src/, testing/, docs/, private/, LICENSE, README.md, CHANGELOG.md)
+#	 1) create files and folders (src/, tests/, docs/, private/, LICENSE, README.md, CHANGELOG.md)
 #	 2) add relevant things to the files (pick LICENSE, add PLACEHOLDER to README.md and add header to CHANGELOG.md)
 #	 3) git init
 #	 4) git add all files (don't add folders cause it would be a pain having to add only folders that users add files to)
@@ -34,6 +104,180 @@ helptext()
 #	- And for the fuck of it add a version test: --version -v
 PARSED_ARGUMENTS=$(getopt -n repogen -o n:u:l:hv --long name:,url:,license:,help,version -- "$@")
 
-if [ "$VALID_ARGUMENTS" != "0" ]; then
+if [ "$?" != "0" ]; then
+	echo "Error: invalid usage: "
 	helptext
+	exit 1
+fi
+
+while :
+do
+	case "$1" in
+		-n | --name)
+			NAME="$2"
+			shift 2
+			;;
+		-u | --url)
+			URL="$2"
+			shift 2
+			;;
+		-l | --license)
+			LICENSE="$2"
+			if [ "$LICENSE" != "MIT" ] && [  "$LICENSE" != "GPL3" ]
+			then
+				echo "Error: Invalid license: '$LICENSE'"
+				exit 1
+			fi
+			shift 2
+			;;
+		-h | --help)
+			helptext
+			exit 0
+			;;
+		-v | --version)
+			printf "repogen "
+			printf "$SCRIPT_VERSION\n"
+			exit 0
+			;;
+		--)
+			shift 1
+			break
+			;;
+		*)
+			break
+			;;
+	esac
+done
+
+if [ "$#" != 1 ] && [ "$#" != 0 ]
+then
+	echo "Error: expected at most one argument after falgs"
+	exit 1
+fi
+
+if [ "$#" == 1 ]
+then
+	DIR="$(realpath "$1" 2>/dev/null)"
+else
+	printf "Enter the directory for the repository to be created in: "
+	read DIR
+	DIR="$(realpath "$DIR" 2>/dev/null)"
+fi
+
+if [ "$?" != "0" ]
+then
+	echo "Error: the given directory does not exist"
+	exit 1
+fi
+
+if [ "$NAME" == "" ]
+then
+	printf "Enter the name of your repository: "
+	read NAME
+fi
+
+if [ "$URl" == "" ]
+then
+	printf "Enter the url (web or ssh) of your repository: "
+	read URL
+fi
+
+PS3='Select your license: '
+options=("MIT" "GPL3" "quit")
+if [ "$LICENSE" == "" ]
+then
+	select opt in "${options[@]}"
+	do
+		case $opt in
+			"MIT" | "GPL3")
+				LICENSE="$opt"
+				break
+				;;
+			"quit")
+				exit 0
+				;;
+			*)
+				echo "invalid option $REPLY"
+				;;
+		esac
+	done
+fi
+
+printf "dir: '$DIR'\nname: '$NAME'\nurl: '$URL'\nlicense: '$LICENSE'\n"
+
+PS3="Confirm selection:"
+options=("yes" "no" "quit")
+select opt in "${options[@]}"
+do
+	case $opt in
+		"yes")
+			break
+			;;
+		"no")
+			selects
+			break
+			;;
+		"quit")
+			exit 0
+			;;
+		*)
+			echo "invalid option $REPLY"
+			;;
+	esac
+done
+
+cd "$DIR" || (echo "Error: could not go into the given directory" && exit 1)
+#	 1) create files and folders (src/, tests/, docs/, private/, LICENSE, README.md, CHANGELOG.md)
+mkdir src
+mkdir tests
+mkdir docs
+mkdir private
+
+echo "# PLACEHOLDER" > README.md
+echo "# Change Log" > CHANGELOG.md
+touch .gitignore
+touch .editorconfig
+
+if [ "$LICENSE" == "MIT" ]
+then
+	$(cat ~/Documents/licenses/MIT_LICENSE > LICENSE)
+else
+	$(cat ~/Documents/licenses/GPL3_LICENSE > LICENSE)
+fi
+
+#	 3) git init
+#	 4) git add all files (don't add folders cause it would be a pain having to add only folders that users add files to)
+#	 5) git commit -m "Initial commit"
+#	 6) ask user for <name> and <url> of remote repo
+#	 7) git remote add <name> <url>
+#	 8) git push --set-upstream <name> main
+
+git init
+git remote add "$NAME" "$URL"
+if [ "$?" != "0" ]
+then
+	echo "Error: could not remote add '$URL'"
+	cleanup $(pwd)
+	exit 1
+fi
+git add README.md CHANGELOG.md .gitignore .editorconfig
+if [ "$?" != "0" ]
+then
+	echo "Error: could add files"
+	cleanup $(pwd)
+	exit 1
+fi
+git commit -m "Initial commit"
+if [ "$?" != "0" ]
+then
+	echo "Error: could not commit"
+	cleanup $(pwd)
+	exit 1
+fi
+git push --set-upstream "$NAME" main
+if [ "$?" != "0" ]
+then
+	echo "Error: could not push"
+	cleanup $(pwd)
+	exit 1
 fi
