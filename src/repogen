@@ -1,11 +1,15 @@
 #!/usr/bin/bash
 
-SCRIPT_VERSION="0.9"
+SCRIPT_VERSION="0.6"
 
 cleanup()
 {
 	cd "$1" || (echo "Error: could not go into the given directory" && exit 1)
-	rm -rI src/ tests/ docs/ private/ LICENSE README.md CHANGELOG.md .editorconfig .gitignore
+	rm -rI src/ tests/ docs/ private/ README.md CHANGELOG.md .editorconfig .gitignore
+	if [ "$INGNORE_LICENSE" != "1" ]
+	then
+		rm LICENSE
+	fi
 	rm -rf .git
 }
 
@@ -19,8 +23,9 @@ helptext()
 	printf "	'--name | -n <name>' -> The name of your remote repository\n"
 	printf "	'--url | -u <url>' -> The url of your remote repository\n"
 	printf "	'--license | -l [MIT | GPL3]' -> The license of your project\n"
-	printf "	'--help | -h' -> Displays this text\n"
-	printf "	'--version' -> Displays the version of this script\n"
+	printf "	'--help | -h' -> Displays this text and exits\n"
+	printf "	'--version' -> Displays the version of this script and exits\n"
+	printf "	'--ignore-license' -> tells the script to not add a license\n"
 }
 
 selects()
@@ -41,24 +46,27 @@ selects()
 
 	printf "Enter the url (web or ssh) of your repository: "
 	read URL
-
-	PS3='Select your license: '
-	options=("MIT" "GPL3" "quit")
-	select opt in "${options[@]}"
-	do
-		case $opt in
-			"MIT" | "GPL3")
-				LICENSE="$opt"
-				break
-				;;
-			"quit")
-				exit 0
-				;;
-			*)
-				echo "invalid option $REPLY"
-				;;
-		esac
-	done
+	
+	if [ "$INGNORE_LICENSE" != "1" ]
+	then
+		PS3='Select your license: '
+		options=("MIT" "GPL3" "quit")
+		select opt in "${options[@]}"
+		do
+			case $opt in
+				"MIT" | "GPL3")
+					LICENSE="$opt"
+					break
+					;;
+				"quit")
+					exit 0
+					;;
+				*)
+					echo "invalid option $REPLY"
+					;;
+			esac
+		done
+	fi
 
 	printf "dir: '$DIR'\nname: '$NAME'\nurl: '$URL'\nlicense: '$LICENSE'\n"
 
@@ -102,7 +110,7 @@ selects()
 #	- Add a license to pick, so we dont have to ask: --license -l <license>
 #	- Add an obligatory help test: --help -h
 #	- And for the fuck of it add a version test: --version -v
-PARSED_ARGUMENTS=$(getopt -n repogen -o n:u:l:hv --long name:,url:,license:,help,version -- "$@")
+PARSED_ARGUMENTS=$(getopt -n repogen -o n:u:l:hv --long name:,ignore-license,url:,license:,help,version -- "$@")
 
 if [ "$?" != "0" ]; then
 	echo "Error: invalid usage: "
@@ -130,6 +138,10 @@ do
 			fi
 			shift 2
 			;;
+		--ignore-license)
+			INGNORE_LICENSE="1"
+			shift 1
+			;;
 		-h | --help)
 			helptext
 			exit 0
@@ -148,6 +160,11 @@ do
 			;;
 	esac
 done
+
+if [ "$INGNORE_LICENSE" == "1" ]
+then 
+	LICENSE="*IGNORED*"
+fi
 
 if [ "$#" != 1 ] && [ "$#" != 0 ]
 then
@@ -184,7 +201,7 @@ fi
 
 PS3='Select your license: '
 options=("MIT" "GPL3" "quit")
-if [ "$LICENSE" == "" ]
+if [ "$LICENSE" == "" ] && [ "$INGNORE_LICENSE" != "1" ]
 then
 	select opt in "${options[@]}"
 	do
@@ -238,19 +255,17 @@ echo "# Change Log" > CHANGELOG.md
 touch .gitignore
 touch .editorconfig
 
+## LICENSE REDIRECT
+
 if [ "$LICENSE" == "MIT" ]
 then
 	$(cat ~/Documents/licenses/MIT_LICENSE > LICENSE)
-else
+elif [ "$LICENSE" == "GPL3" ]
+then
 	$(cat ~/Documents/licenses/GPL3_LICENSE > LICENSE)
+else
+	touch LICENSE
 fi
-
-#	 3) git init
-#	 4) git add all files (don't add folders cause it would be a pain having to add only folders that users add files to)
-#	 5) git commit -m "Initial commit"
-#	 6) ask user for <name> and <url> of remote repo
-#	 7) git remote add <name> <url>
-#	 8) git push --set-upstream <name> main
 
 git init
 git remote add "$NAME" "$URL"
@@ -260,6 +275,7 @@ then
 	cleanup $(pwd)
 	exit 1
 fi
+
 git add README.md CHANGELOG.md .gitignore .editorconfig
 if [ "$?" != "0" ]
 then
@@ -267,13 +283,24 @@ then
 	cleanup $(pwd)
 	exit 1
 fi
-git commit -m "Initial commit"
+
+git add LICENSE
+
+if [ "$?" != "0" ]
+then
+	echo "Error: could add the license"
+	cleanup $(pwd)
+	exit 1
+fi
+
+git commit -m "initial commit"
 if [ "$?" != "0" ]
 then
 	echo "Error: could not commit"
 	cleanup $(pwd)
 	exit 1
 fi
+
 git push --set-upstream "$NAME" main
 if [ "$?" != "0" ]
 then
