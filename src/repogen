@@ -293,7 +293,7 @@ then
 	exit 1
 fi
 
-git commit -m "initial commit"
+git commit -m "Initial commit"
 if [ "$?" != "0" ]
 then
 	echo "Error: could not commit"
