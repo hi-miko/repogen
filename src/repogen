@@ -245,10 +245,10 @@ done
 
 cd "$DIR" || (echo "Error: could not go into the given directory" && exit 1)
 #	 1) create files and folders (src/, tests/, docs/, private/, LICENSE, README.md, CHANGELOG.md)
-mkdir src
-mkdir tests
-mkdir docs
-mkdir private
+mkdir -p src
+mkdir -p tests
+mkdir -p docs
+mkdir -p private
 
 echo "# PLACEHOLDER" > README.md
 echo "# Change Log" > CHANGELOG.md
@@ -279,7 +279,7 @@ fi
 git add README.md CHANGELOG.md .gitignore .editorconfig
 if [ "$?" != "0" ]
 then
-	echo "Error: could add files"
+	echo "Error: could not add files"
 	cleanup $(pwd)
 	exit 1
 fi
@@ -288,7 +288,7 @@ git add LICENSE
 
 if [ "$?" != "0" ]
 then
-	echo "Error: could add the license"
+	echo "Error: could not add the license"
 	cleanup $(pwd)
 	exit 1
 fi
